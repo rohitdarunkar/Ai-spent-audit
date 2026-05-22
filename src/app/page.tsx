@@ -1,39 +1,127 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 
-const tools = [
-  "Cursor",
-  "ChatGPT",
-  "Claude",
-  "GitHub Copilot",
-  "Gemini",
-  "OpenAI API",
-  "Anthropic API",
-];
+import ToolEntry from "@/components/tool-entry";
+
+import { generateAudit } from "@/lib/audit-engine";
+
+import {
+  AuditResult,
+  ToolEntry as ToolEntryType,
+  UseCase,
+} from "@/types/audit";
 
 export default function HomePage() {
-  const [selectedTool, setSelectedTool] =
-    useState("ChatGPT");
+  const [tools, setTools] = useState<
+    ToolEntryType[]
+  >([
+    {
+      id: uuidv4(),
+      tool: "ChatGPT",
+      plan: "Team",
+      monthlySpend: 120,
+      seats: 3,
+    },
+  ]);
 
-  const [plan, setPlan] = useState("Team");
+  const [teamSize, setTeamSize] =
+    useState(5);
 
-  const [monthlySpend, setMonthlySpend] =
-    useState(120);
+  const [useCase, setUseCase] =
+    useState<UseCase>("mixed");
 
-  const [seats, setSeats] = useState(3);
+  const [result, setResult] =
+    useState<AuditResult | null>(null);
 
-  const savings = useMemo(() => {
-    if (plan === "Team" && seats <= 2) {
-      return Math.round(monthlySpend * 0.3);
+  // LOAD LOCAL STORAGE
+
+  useEffect(() => {
+    const saved = localStorage.getItem(
+      "ai-spend-audit"
+    );
+
+    if (saved) {
+      const parsed = JSON.parse(saved);
+
+      setTools(parsed.tools);
+      setTeamSize(parsed.teamSize);
+      setUseCase(parsed.useCase);
     }
+  }, []);
 
-    if (plan === "Enterprise" && seats < 10) {
-      return Math.round(monthlySpend * 0.5);
-    }
+  // SAVE LOCAL STORAGE
 
-    return 0;
-  }, [plan, monthlySpend, seats]);
+  useEffect(() => {
+    localStorage.setItem(
+      "ai-spend-audit",
+      JSON.stringify({
+        tools,
+        teamSize,
+        useCase,
+      })
+    );
+  }, [tools, teamSize, useCase]);
+
+  function updateEntry(
+    index: number,
+    field: string,
+    value: string | number
+  ) {
+    const updated = [...tools];
+
+    updated[index] = {
+      ...updated[index],
+      [field]: value,
+    };
+
+    setTools(updated);
+  }
+
+  function addTool() {
+    setTools([
+      ...tools,
+      {
+        id: uuidv4(),
+        tool: "Claude",
+        plan: "Pro",
+        monthlySpend: 20,
+        seats: 1,
+      },
+    ]);
+  }
+
+  function removeTool(id: string) {
+    setTools(
+      tools.filter((tool) => tool.id !== id)
+    );
+  }
+
+  function runAudit() {
+    const audit = generateAudit({
+      tools,
+      teamSize,
+      useCase,
+    });
+
+    setResult(audit);
+
+    localStorage.setItem(
+      "audit-result",
+      JSON.stringify(audit)
+    );
+
+    window.location.href = "/results";
+  }
+
+  const totalSpend = useMemo(() => {
+    return tools.reduce(
+      (acc, item) =>
+        acc + item.monthlySpend,
+      0
+    );
+  }, [tools]);
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -51,9 +139,8 @@ export default function HomePage() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg text-zinc-400">
-            Audit your AI stack in under 60 seconds.
-            Detect waste, downgrade overpriced plans,
-            and uncover hidden savings opportunities.
+            Detect wasted AI spend, redundant
+            subscriptions, and overpriced plans.
           </p>
         </div>
 
@@ -61,166 +148,199 @@ export default function HomePage() {
           {/* LEFT PANEL */}
 
           <div className="rounded-3xl border border-white/10 bg-zinc-900/50 p-8">
-            <h2 className="text-2xl font-semibold">
-              AI Spend Audit
-            </h2>
-
-            <p className="mt-2 text-sm text-zinc-400">
-              Enter your current AI subscriptions.
-            </p>
-
-            <div className="mt-8 space-y-6">
+            <div className="flex items-center justify-between">
               <div>
-                <label className="mb-2 block text-sm text-zinc-300">
-                  Tool
-                </label>
+                <h2 className="text-2xl font-semibold">
+                  AI Stack
+                </h2>
 
-                <select
-                  value={selectedTool}
-                  onChange={(e) =>
-                    setSelectedTool(e.target.value)
-                  }
-                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none"
+                <p className="mt-2 text-zinc-400">
+                  Current monthly spend: $
+                  {totalSpend}
+                </p>
+              </div>
+
+              <button
+                onClick={addTool}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-black"
+              >
+                Add Tool
+              </button>
+            </div>
+
+            <div className="mt-8 space-y-5">
+              {tools.map((entry, index) => (
+                <div
+                  key={entry.id}
+                  className="relative"
                 >
-                  {tools.map((tool) => (
-                    <option
-                      key={tool}
-                      value={tool}
+                  <ToolEntry
+                    index={index}
+                    entry={entry}
+                    updateEntry={updateEntry}
+                  />
+
+                  {tools.length > 1 && (
+                    <button
+                      onClick={() =>
+                        removeTool(entry.id)
+                      }
+                      className="absolute right-3 top-3 text-sm text-red-400"
                     >
-                      {tool}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
 
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm text-zinc-300">
-                  Plan
-                </label>
-
-                <select
-                  value={plan}
-                  onChange={(e) =>
-                    setPlan(e.target.value)
-                  }
-                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none"
-                >
-                  <option>Free</option>
-                  <option>Pro</option>
-                  <option>Team</option>
-                  <option>Enterprise</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm text-zinc-300">
-                  Monthly Spend ($)
+                <label className="mb-2 block text-sm text-zinc-400">
+                  Team Size
                 </label>
 
                 <input
                   type="number"
-                  value={monthlySpend}
+                  value={teamSize}
                   onChange={(e) =>
-                    setMonthlySpend(
+                    setTeamSize(
                       Number(e.target.value)
                     )
                   }
-                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none"
+                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm text-zinc-300">
-                  Seats
+                <label className="mb-2 block text-sm text-zinc-400">
+                  Primary Use Case
                 </label>
 
-                <input
-                  type="number"
-                  value={seats}
+                <select
+                  value={useCase}
                   onChange={(e) =>
-                    setSeats(Number(e.target.value))
+                    setUseCase(
+                      e.target
+                        .value as UseCase
+                    )
                   }
-                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none"
-                />
-              </div>
+                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3"
+                >
+                  <option value="coding">
+                    Coding
+                  </option>
 
-              <button className="w-full rounded-xl bg-white px-6 py-4 font-semibold text-black transition hover:bg-zinc-200">
-                Generate Audit
-              </button>
+                  <option value="writing">
+                    Writing
+                  </option>
+
+                  <option value="research">
+                    Research
+                  </option>
+
+                  <option value="data">
+                    Data
+                  </option>
+
+                  <option value="mixed">
+                    Mixed
+                  </option>
+                </select>
+              </div>
             </div>
+
+            <button
+              onClick={runAudit}
+              className="mt-8 w-full rounded-2xl bg-white px-6 py-4 font-semibold text-black transition hover:bg-zinc-200"
+            >
+              Generate Audit
+            </button>
           </div>
 
           {/* RIGHT PANEL */}
 
           <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-zinc-900 to-black p-8">
-            <div className="flex items-center justify-between">
+            {!result ? (
+              <div className="flex h-full items-center justify-center text-zinc-500">
+                Run an audit to see optimization
+                opportunities.
+              </div>
+            ) : (
               <div>
-                <p className="text-sm text-zinc-400">
-                  Estimated Savings
-                </p>
-
-                <h2 className="mt-2 text-6xl font-bold">
-                  ${savings}
-                </h2>
-
-                <p className="mt-2 text-zinc-500">
-                  per month
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-400">
-                Optimization Found
-              </div>
-            </div>
-
-            <div className="mt-10 space-y-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">
-                    {selectedTool}
-                  </h3>
+                  <div>
+                    <p className="text-zinc-400">
+                      Monthly Savings
+                    </p>
 
-                  <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-sm text-emerald-400">
-                    Save ${savings}
-                  </span>
+                    <h2 className="mt-2 text-6xl font-bold">
+                      $
+                      {Math.round(
+                        result.totalSavings
+                      )}
+                    </h2>
+
+                    <p className="mt-2 text-zinc-500">
+                      per month
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-400">
+                    Audit Complete
+                  </div>
                 </div>
 
-                <p className="mt-3 text-zinc-400">
-                  {plan === "Team" && seats <= 2
-                    ? "Your team is likely overpaying for collaboration features that are underutilized."
-                    : plan === "Enterprise" &&
-                      seats < 10
-                    ? "Enterprise pricing is likely excessive for your current scale."
-                    : "Your current plan appears reasonably optimized."}
-                </p>
+                <div className="mt-10 space-y-4">
+                  {result.recommendations.map(
+                    (rec) => (
+                      <div
+                        key={rec.tool}
+                        className="rounded-2xl border border-white/10 bg-white/5 p-5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold">
+                            {rec.tool}
+                          </h3>
+
+                          <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-sm text-emerald-400">
+                            Save $
+                            {Math.round(
+                              rec.savings
+                            )}
+                          </span>
+                        </div>
+
+                        <p className="mt-3 text-sm text-zinc-300">
+                          {rec.action}
+                        </p>
+
+                        <p className="mt-2 text-sm text-zinc-500">
+                          {rec.reason}
+                        </p>
+                      </div>
+                    )
+                  )}
+
+                  <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 p-5">
+                    <h3 className="font-semibold text-indigo-300">
+                      Annual Savings Potential
+                    </h3>
+
+                    <p className="mt-4 text-5xl font-bold">
+                      $
+                      {Math.round(
+                        result.annualSavings
+                      )}
+                    </p>
+
+                    <p className="mt-2 text-indigo-200/70">
+                      projected yearly reduction
+                    </p>
+                  </div>
+                </div>
               </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <h3 className="font-semibold">
-                  Annual Savings Potential
-                </h3>
-
-                <p className="mt-4 text-4xl font-bold">
-                  ${savings * 12}
-                </p>
-
-                <p className="mt-2 text-zinc-500">
-                  projected yearly reduction
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 p-5">
-                <h3 className="font-semibold text-indigo-300">
-                  Credex Optimization
-                </h3>
-
-                <p className="mt-3 text-indigo-200/80">
-                  Companies with high AI spend can
-                  reduce costs further through discounted
-                  infrastructure credits.
-                </p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </section>
