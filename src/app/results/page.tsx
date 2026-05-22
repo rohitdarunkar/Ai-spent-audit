@@ -135,10 +135,7 @@ export default function ResultsPage() {
 
                 <p className="mt-3 max-w-2xl text-indigo-200/80">
                   Your stack shows meaningful AI
-                  overspend. Credex can help reduce
-                  costs further through discounted AI
-                  infrastructure credits and vendor
-                  optimization.
+                  overspend.
                 </p>
 
                 <button className="mt-6 rounded-xl bg-white px-6 py-3 font-semibold text-black">
@@ -152,9 +149,7 @@ export default function ResultsPage() {
                 </h3>
 
                 <p className="mt-3 text-indigo-200/80">
-                  We didn’t detect major overspend in
-                  your current stack. That’s a good
-                  thing.
+                  No major overspend detected.
                 </p>
 
                 <button className="mt-6 rounded-xl border border-white/10 px-6 py-3">

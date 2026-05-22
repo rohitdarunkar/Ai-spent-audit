@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 
 import ToolEntry from "@/components/tool-entry";
