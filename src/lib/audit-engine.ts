@@ -1,177 +1,122 @@
 import {
-  AuditInput,
+  ToolConfiguration,
   AuditResult,
   Recommendation,
+  UseCase,
 } from "@/types/audit";
 
-export function generateAudit(
-  input: AuditInput
+export function runAudit(
+  tools: ToolConfiguration[],
+  teamSize: number,
+  useCase: UseCase
 ): AuditResult {
   const recommendations: Recommendation[] = [];
 
-  const hasChatGPT = input.tools.some((t) =>
-    t.tool.toLowerCase().includes("chatgpt")
-  );
+  let totalSavings = 0;
 
-  const hasClaude = input.tools.some((t) =>
-    t.tool.toLowerCase().includes("claude")
-  );
-
-  const hasGemini = input.tools.some((t) =>
-    t.tool.toLowerCase().includes("gemini")
-  );
-
-  const hasMultipleGeneralTools =
-    [hasChatGPT, hasClaude, hasGemini].filter(
-      Boolean
-    ).length >= 2;
-
-  for (const item of input.tools) {
-    let optimizedSpend = item.monthlySpend;
+  for (const tool of tools) {
+    let optimizedSpend = tool.monthlySpend;
 
     let action =
       "Current configuration appears optimized.";
 
-    let reason =
+    let reasoning =
       "No significant savings opportunity detected.";
 
-    // TEAM PLAN OVERKILL
+    // DUPLICATE TOOL CHECK
+
+    const duplicateTools = tools.filter(
+      (t) => t.tool !== tool.tool
+    );
 
     if (
-      item.plan.toLowerCase() === "team" &&
-      item.seats <= 2
+      duplicateTools.length >= 1 &&
+      useCase === "Coding"
     ) {
-      optimizedSpend *= 0.7;
-
-      action = "Downgrade from Team";
-
-      reason =
-        "Small teams typically underutilize collaboration and admin features included in Team tiers.";
-    }
-
-    // ENTERPRISE OVERKILL
-
-    if (
-      item.plan.toLowerCase() ===
-        "enterprise" &&
-      item.seats < 10
-    ) {
-      optimizedSpend *= 0.5;
-
-      action = "Move off Enterprise";
-
-      reason =
-        "Enterprise pricing is difficult to justify below 10 active seats.";
-    }
-
-    // OVERLAPPING GENERAL AI TOOLS
-
-    if (
-      hasMultipleGeneralTools &&
-      input.useCase === "mixed"
-    ) {
-      optimizedSpend *= 0.85;
+      optimizedSpend =
+        tool.monthlySpend * 0.7;
 
       action =
-        "Consolidate overlapping subscriptions";
+        "Consolidate overlapping AI tooling.";
 
-      reason =
-        "Your stack contains overlapping general-purpose AI assistants with similar capabilities.";
+      reasoning =
+        "Multiple coding assistants detected. Teams often reduce costs by standardizing on one platform.";
     }
 
-    // CODING TOOL OVERLAP
+    // TEAM PLAN OVERSIZED
 
-    if (
-      input.useCase === "coding" &&
-      input.tools.length >= 3
+    else if (
+      tool.plan === "Team" &&
+      tool.seats <= 5
     ) {
-      optimizedSpend *= 0.9;
+      optimizedSpend =
+        tool.monthlySpend * 0.6;
 
       action =
-        "Reduce duplicated coding copilots";
+        "Downgrade from Team plan.";
 
-      reason =
-        "Engineering teams often oversubscribe to multiple coding assistants with overlapping functionality.";
+      reasoning =
+        "Smaller teams may not fully utilize enterprise collaboration features.";
     }
 
-    // API + SUBSCRIPTION OVERLAP
+    // HIGH SPEND DETECTION
 
-    const usesAPI =
-      input.tools.some((t) =>
-        t.tool.toLowerCase().includes("api")
-      );
-
-    if (
-      usesAPI &&
-      (
-        item.tool
-          .toLowerCase()
-          .includes("chatgpt") ||
-        item.tool
-          .toLowerCase()
-          .includes("claude")
-      )
+    else if (
+      tool.monthlySpend >= 150
     ) {
-      optimizedSpend *= 0.9;
+      optimizedSpend =
+        tool.monthlySpend * 0.75;
 
       action =
-        "Reduce duplicated API + subscription spend";
+        "Negotiate enterprise pricing.";
 
-      reason =
-        "Teams using direct APIs often maintain redundant premium subscriptions.";
-    }
-
-    // LARGE TEAM OPTIMIZATION
-
-    if (
-      input.teamSize >= 20 &&
-      item.plan.toLowerCase() === "pro"
-    ) {
-      optimizedSpend *= 0.8;
-
-      action =
-        "Standardize billing across team";
-
-      reason =
-        "Larger organizations often reduce costs by consolidating fragmented individual subscriptions.";
+      reasoning =
+        "High monthly spend suggests potential vendor discount opportunities.";
     }
 
     const savings =
-      item.monthlySpend - optimizedSpend;
+      tool.monthlySpend -
+      optimizedSpend;
+
+    totalSavings += savings;
 
     recommendations.push({
-      tool: item.tool,
-      currentSpend: item.monthlySpend,
+      tool: tool.tool,
+
+      currentSpend:
+        tool.monthlySpend,
+
       optimizedSpend,
+
       savings,
+
       action,
-      reason,
+
+      reasoning,
     });
   }
 
-  const totalCurrentSpend =
-    recommendations.reduce(
-      (acc, item) =>
-        acc + item.currentSpend,
-      0
-    );
-
-  const totalOptimizedSpend =
-    recommendations.reduce(
-      (acc, item) =>
-        acc + item.optimizedSpend,
-      0
-    );
-
-  const totalSavings =
-    totalCurrentSpend -
-    totalOptimizedSpend;
-
   return {
-    recommendations,
-    totalCurrentSpend,
-    totalOptimizedSpend,
+    totalCurrentSpend: tools.reduce(
+      (acc, tool) =>
+        acc + tool.monthlySpend,
+      0
+    ),
+
+    totalOptimizedSpend:
+      tools.reduce(
+        (acc, tool) =>
+          acc + tool.monthlySpend,
+        0
+      ) - totalSavings,
+
     totalSavings,
-    annualSavings: totalSavings * 12,
+
+    recommendations,
+
+    summary:
+      totalSavings > 200
+        ? "Your AI stack shows meaningful optimization opportunities."
+        : "Your AI stack appears reasonably optimized with limited overspend opportunities detected.",
   };
 }

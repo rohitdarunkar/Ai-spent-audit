@@ -1,22 +1,17 @@
 export type UseCase =
-  | "coding"
-  | "writing"
-  | "research"
-  | "data"
-  | "mixed";
+  | "Coding"
+  | "Writing"
+  | "Research"
+  | "Data"
+  | "Mixed";
 
-export interface ToolEntry {
-  id: string;
+export type TeamSize = number;
+
+export interface ToolConfiguration {
   tool: string;
   plan: string;
   monthlySpend: number;
   seats: number;
-}
-
-export interface AuditInput {
-  tools: ToolEntry[];
-  teamSize: number;
-  useCase: UseCase;
 }
 
 export interface Recommendation {
@@ -25,13 +20,13 @@ export interface Recommendation {
   optimizedSpend: number;
   savings: number;
   action: string;
-  reason: string;
+  reasoning: string;
 }
 
 export interface AuditResult {
-  recommendations: Recommendation[];
   totalCurrentSpend: number;
   totalOptimizedSpend: number;
   totalSavings: number;
-  annualSavings: number;
+  recommendations: Recommendation[];
+  summary: string;
 }

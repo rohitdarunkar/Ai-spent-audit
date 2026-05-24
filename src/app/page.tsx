@@ -1,78 +1,66 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { v4 as uuidv4 } from "uuid";
 
 import ToolEntry from "@/components/tool-entry";
 
-import { generateAudit } from "@/lib/audit-engine";
+import { runAudit } from "@/lib/audit-engine";
 
 import {
   AuditResult,
-  ToolEntry as ToolEntryType,
+  TeamSize,
   UseCase,
+  ToolConfiguration,
 } from "@/types/audit";
 
 export default function HomePage() {
-  const [tools, setTools] = useState<
-    ToolEntryType[]
-  >([
+  const router = useRouter();
+
+  const [teamSize, setTeamSize] = useState<TeamSize>(5);
+
+  const [useCase, setUseCase] = useState<UseCase>("Mixed");
+
+  const [tools, setTools] = useState<ToolConfiguration[]>([
     {
-      id: uuidv4(),
       tool: "ChatGPT",
       plan: "Team",
-      monthlySpend: 120,
-      seats: 3,
+      monthlySpend: 200,
+      seats: 5,
+    },
+    {
+      tool: "Claude",
+      plan: "Pro",
+      monthlySpend: 150,
+      seats: 5,
     },
   ]);
 
-  const [teamSize, setTeamSize] =
-    useState(5);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [useCase, setUseCase] =
-    useState<UseCase>("mixed");
+  const totalSpend = useMemo(() => {
+    return tools.reduce((acc, tool) => acc + tool.monthlySpend, 0);
+  }, [tools]);
 
-  const [result, setResult] =
-    useState<AuditResult | null>(null);
+  function addTool() {
+    setTools((prev) => [
+      ...prev,
+      {
+        tool: "GitHub Copilot",
+        plan: "Individual",
+        monthlySpend: 20,
+        seats: 1,
+      },
+    ]);
+  }
 
-  // LOAD LOCAL STORAGE
+  function removeTool(index: number) {
+    setTools((prev) => prev.filter((_, i) => i !== index));
+  }
 
-  useEffect(() => {
-    const saved = localStorage.getItem(
-      "ai-spend-audit"
-    );
-
-    if (saved) {
-      const parsed = JSON.parse(saved);
-
-      setTools(parsed.tools);
-      setTeamSize(parsed.teamSize);
-      setUseCase(parsed.useCase);
-    }
-  }, []);
-
-  // SAVE LOCAL STORAGE
-
-  useEffect(() => {
-    localStorage.setItem(
-      "ai-spend-audit",
-      JSON.stringify({
-        tools,
-        teamSize,
-        useCase,
-      })
-    );
-  }, [tools, teamSize, useCase]);
-
-  function updateEntry(
+  function updateTool(
     index: number,
-    field: string,
+    field: keyof ToolConfiguration,
     value: string | number
   ) {
     const updated = [...tools];
@@ -85,118 +73,78 @@ export default function HomePage() {
     setTools(updated);
   }
 
-  function addTool() {
-    setTools([
-      ...tools,
-      {
-        id: uuidv4(),
-        tool: "Claude",
-        plan: "Pro",
-        monthlySpend: 20,
-        seats: 1,
-      },
-    ]);
+  async function handleGenerateAudit() {
+    try {
+      setIsLoading(true);
+
+      const result: AuditResult = await runAudit(
+        tools,
+        teamSize,
+        useCase
+      );
+
+      localStorage.setItem("audit-result", JSON.stringify(result));
+
+      router.push("/results");
+    } catch (error) {
+      console.error("Audit generation failed:", error);
+
+      alert("Failed to generate audit.");
+    } finally {
+      setIsLoading(false);
+    }
   }
-
-  function removeTool(id: string) {
-    setTools(
-      tools.filter((tool) => tool.id !== id)
-    );
-  }
-
-  function runAudit() {
-    const audit = generateAudit({
-      tools,
-      teamSize,
-      useCase,
-    });
-
-    setResult(audit);
-
-    localStorage.setItem(
-      "audit-result",
-      JSON.stringify(audit)
-    );
-
-    window.location.href = "/results";
-  }
-
-  const totalSpend = useMemo(() => {
-    return tools.reduce(
-      (acc, item) =>
-        acc + item.monthlySpend,
-      0
-    );
-  }, [tools]);
 
   return (
     <main className="min-h-screen bg-black text-white">
       <section className="mx-auto max-w-7xl px-6 py-20">
         <div className="mx-auto max-w-3xl text-center">
-          <div className="mb-5 inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-1 text-sm text-zinc-300">
+          <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-1 text-sm text-white/70">
             AI Spend Intelligence
           </div>
 
-          <h1 className="text-5xl font-bold tracking-tight md:text-7xl">
+          <h1 className="mt-6 text-6xl font-bold leading-none tracking-tight">
             Stop Overpaying
-            <span className="block text-zinc-500">
-              for AI Tools
-            </span>
+            <br />
+            <span className="text-zinc-500">for AI Tools</span>
           </h1>
 
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-zinc-400">
-            Detect wasted AI spend, redundant
-            subscriptions, and overpriced plans.
+          <p className="mt-6 text-lg text-zinc-400">
+            Detect wasted AI spend, redundant subscriptions,
+            and overpriced plans.
           </p>
         </div>
 
         <div className="mt-16 grid gap-8 lg:grid-cols-2">
-          {/* LEFT PANEL */}
-
-          <div className="rounded-3xl border border-white/10 bg-zinc-900/50 p-8">
+          <div className="rounded-3xl border border-white/10 bg-zinc-950 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-semibold">
+                <h2 className="text-3xl font-bold">
                   AI Stack
                 </h2>
 
                 <p className="mt-2 text-zinc-400">
-                  Current monthly spend: $
-                  {totalSpend}
+                  Current monthly spend: ${totalSpend}
                 </p>
               </div>
 
               <button
                 onClick={addTool}
-                className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-black"
+                className="rounded-xl bg-white px-5 py-3 font-medium text-black transition hover:bg-zinc-200"
               >
                 Add Tool
               </button>
             </div>
 
-            <div className="mt-8 space-y-5">
-              {tools.map((entry, index) => (
-                <div
-                  key={entry.id}
-                  className="relative"
-                >
-                  <ToolEntry
-                    index={index}
-                    entry={entry}
-                    updateEntry={updateEntry}
-                  />
-
-                  {tools.length > 1 && (
-                    <button
-                      onClick={() =>
-                        removeTool(entry.id)
-                      }
-                      className="absolute right-3 top-3 text-sm text-red-400"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
+            <div className="mt-8 space-y-6">
+              {tools.map((tool, index) => (
+                <ToolEntry
+                  key={index}
+                  tool={tool}
+                  index={index}
+                  updateTool={updateTool}
+                  removeTool={removeTool}
+                />
               ))}
             </div>
 
@@ -210,11 +158,9 @@ export default function HomePage() {
                   type="number"
                   value={teamSize}
                   onChange={(e) =>
-                    setTeamSize(
-                      Number(e.target.value)
-                    )
+                    setTeamSize(Number(e.target.value))
                   }
-                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3"
+                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none"
                 />
               </div>
 
@@ -226,127 +172,34 @@ export default function HomePage() {
                 <select
                   value={useCase}
                   onChange={(e) =>
-                    setUseCase(
-                      e.target
-                        .value as UseCase
-                    )
+                    setUseCase(e.target.value as UseCase)
                   }
-                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3"
+                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none"
                 >
-                  <option value="coding">
-                    Coding
-                  </option>
-
-                  <option value="writing">
-                    Writing
-                  </option>
-
-                  <option value="research">
-                    Research
-                  </option>
-
-                  <option value="data">
-                    Data
-                  </option>
-
-                  <option value="mixed">
-                    Mixed
-                  </option>
+                  <option value="Coding">Coding</option>
+                  <option value="Writing">Writing</option>
+                  <option value="Research">Research</option>
+                  <option value="Data">Data</option>
+                  <option value="Mixed">Mixed</option>
                 </select>
               </div>
             </div>
 
             <button
-              onClick={runAudit}
-              className="mt-8 w-full rounded-2xl bg-white px-6 py-4 font-semibold text-black transition hover:bg-zinc-200"
+              onClick={handleGenerateAudit}
+              disabled={isLoading}
+              className="mt-8 w-full rounded-2xl bg-white px-6 py-4 text-lg font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50"
             >
-              Generate Audit
+              {isLoading
+                ? "Generating Audit..."
+                : "Generate Audit"}
             </button>
           </div>
 
-          {/* RIGHT PANEL */}
-
-          <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-zinc-900 to-black p-8">
-            {!result ? (
-              <div className="flex h-full items-center justify-center text-zinc-500">
-                Run an audit to see optimization
-                opportunities.
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-zinc-400">
-                      Monthly Savings
-                    </p>
-
-                    <h2 className="mt-2 text-6xl font-bold">
-                      $
-                      {Math.round(
-                        result.totalSavings
-                      )}
-                    </h2>
-
-                    <p className="mt-2 text-zinc-500">
-                      per month
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-400">
-                    Audit Complete
-                  </div>
-                </div>
-
-                <div className="mt-10 space-y-4">
-                  {result.recommendations.map(
-                    (rec) => (
-                      <div
-                        key={rec.tool}
-                        className="rounded-2xl border border-white/10 bg-white/5 p-5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold">
-                            {rec.tool}
-                          </h3>
-
-                          <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-sm text-emerald-400">
-                            Save $
-                            {Math.round(
-                              rec.savings
-                            )}
-                          </span>
-                        </div>
-
-                        <p className="mt-3 text-sm text-zinc-300">
-                          {rec.action}
-                        </p>
-
-                        <p className="mt-2 text-sm text-zinc-500">
-                          {rec.reason}
-                        </p>
-                      </div>
-                    )
-                  )}
-
-                  <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 p-5">
-                    <h3 className="font-semibold text-indigo-300">
-                      Annual Savings Potential
-                    </h3>
-
-                    <p className="mt-4 text-5xl font-bold">
-                      $
-                      {Math.round(
-                        result.annualSavings
-                      )}
-                    </p>
-
-                    <p className="mt-2 text-indigo-200/70">
-                      projected yearly reduction
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+          <div className="flex items-center justify-center rounded-3xl border border-white/10 bg-gradient-to-b from-zinc-900 to-black p-8">
+            <p className="text-zinc-500">
+              Run an audit to see optimization opportunities.
+            </p>
           </div>
         </div>
       </section>

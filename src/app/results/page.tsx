@@ -8,19 +8,39 @@ export default function ResultsPage() {
   const [result, setResult] =
     useState<AuditResult | null>(null);
 
+  const [summary, setSummary] =
+    useState("");
+
   useEffect(() => {
     const saved =
       localStorage.getItem("audit-result");
 
     if (saved) {
-      setResult(JSON.parse(saved));
+      const parsed = JSON.parse(saved);
+
+      setResult(parsed);
+
+      fetch("/api/generate-summary", {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body: JSON.stringify(parsed),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          setSummary(data.summary);
+        });
     }
   }, []);
 
   if (!result) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-black text-white">
-        No audit results found.
+        Loading audit results...
       </main>
     );
   }
@@ -46,7 +66,8 @@ export default function ResultsPage() {
               </h1>
 
               <p className="mt-3 text-zinc-500">
-                monthly optimization potential
+                monthly optimization
+                potential
               </p>
             </div>
 
@@ -58,11 +79,27 @@ export default function ResultsPage() {
               <h2 className="mt-2 text-4xl font-bold text-white">
                 $
                 {Math.round(
-                  result.annualSavings
+                  result.totalSavings * 12
                 )}
               </h2>
             </div>
           </div>
+
+          {/* AI SUMMARY */}
+
+          <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6">
+            <h3 className="text-xl font-semibold">
+              AI Executive Summary
+            </h3>
+
+            <p className="mt-4 whitespace-pre-line leading-7 text-zinc-300">
+              {summary ||
+                result.summary ||
+                "Generating AI summary..."}
+            </p>
+          </div>
+
+          {/* RECOMMENDATIONS */}
 
           <div className="mt-12 grid gap-5">
             {result.recommendations.map(
@@ -82,7 +119,7 @@ export default function ResultsPage() {
                       </p>
 
                       <p className="mt-3 max-w-2xl text-sm text-zinc-500">
-                        {rec.reason}
+                        {rec.reasoning}
                       </p>
                     </div>
 
@@ -126,16 +163,22 @@ export default function ResultsPage() {
             )}
           </div>
 
+          {/* CTA SECTION */}
+
           <div className="mt-10 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 p-6">
             {highSavings ? (
               <div>
                 <h3 className="text-2xl font-semibold text-indigo-300">
-                  Significant Savings Opportunity
+                  Significant Savings
+                  Opportunity
                 </h3>
 
                 <p className="mt-3 max-w-2xl text-indigo-200/80">
-                  Your stack shows meaningful AI
-                  overspend.
+                  Your stack shows
+                  meaningful AI overspend.
+                  Credex can help optimize
+                  vendor contracts and
+                  infrastructure spend.
                 </p>
 
                 <button className="mt-6 rounded-xl bg-white px-6 py-3 font-semibold text-black">
@@ -149,11 +192,13 @@ export default function ResultsPage() {
                 </h3>
 
                 <p className="mt-3 text-indigo-200/80">
-                  No major overspend detected.
+                  No major overspend
+                  detected.
                 </p>
 
                 <button className="mt-6 rounded-xl border border-white/10 px-6 py-3">
-                  Notify Me About Future Optimizations
+                  Notify Me About Future
+                  Optimizations
                 </button>
               </div>
             )}
