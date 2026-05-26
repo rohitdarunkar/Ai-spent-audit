@@ -20,7 +20,7 @@ export function runAudit(
     let action =
       "Current configuration appears optimized.";
 
-    let reasoning =
+    let reason =
       "No significant savings opportunity detected.";
 
     // DUPLICATE TOOL CHECK
@@ -39,7 +39,7 @@ export function runAudit(
       action =
         "Consolidate overlapping AI tooling.";
 
-      reasoning =
+      reason =
         "Multiple coding assistants detected. Teams often reduce costs by standardizing on one platform.";
     }
 
@@ -55,7 +55,7 @@ export function runAudit(
       action =
         "Downgrade from Team plan.";
 
-      reasoning =
+      reason =
         "Smaller teams may not fully utilize enterprise collaboration features.";
     }
 
@@ -70,7 +70,7 @@ export function runAudit(
       action =
         "Negotiate enterprise pricing.";
 
-      reasoning =
+      reason =
         "High monthly spend suggests potential vendor discount opportunities.";
     }
 
@@ -92,31 +92,34 @@ export function runAudit(
 
       action,
 
-      reasoning,
+      reason,
     });
   }
 
   return {
-    totalCurrentSpend: tools.reduce(
+  totalCurrentSpend: tools.reduce(
+    (acc, tool) =>
+      acc + tool.monthlySpend,
+    0
+  ),
+
+  totalOptimizedSpend:
+    tools.reduce(
       (acc, tool) =>
         acc + tool.monthlySpend,
       0
-    ),
+    ) - totalSavings,
 
-    totalOptimizedSpend:
-      tools.reduce(
-        (acc, tool) =>
-          acc + tool.monthlySpend,
-        0
-      ) - totalSavings,
+  totalSavings,
 
-    totalSavings,
+  annualSavings:
+    totalSavings * 12,
 
-    recommendations,
+  recommendations,
 
-    summary:
-      totalSavings > 200
-        ? "Your AI stack shows meaningful optimization opportunities."
-        : "Your AI stack appears reasonably optimized with limited overspend opportunities detected.",
-  };
+  summary:
+    totalSavings > 200
+      ? "Your AI stack shows meaningful optimization opportunities."
+      : "Your AI stack appears reasonably optimized with limited overspend opportunities detected.",
+};
 }

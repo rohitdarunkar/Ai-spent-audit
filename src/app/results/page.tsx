@@ -1,6 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+  useRef,
+} from "react";
+
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
+import jsPDF from "jspdf";
+
+import html2canvas from "html2canvas";
 
 import { AuditResult } from "@/types/audit";
 
@@ -10,6 +27,9 @@ export default function ResultsPage() {
 
   const [summary, setSummary] =
     useState("");
+
+  const reportRef =
+    useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved =
@@ -37,6 +57,44 @@ export default function ResultsPage() {
     }
   }, []);
 
+  async function downloadPDF() {
+    if (!reportRef.current) return;
+
+    const canvas =
+      await html2canvas(
+        reportRef.current
+      );
+
+    const imgData =
+      canvas.toDataURL("image/png");
+
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "px",
+      format: "a4",
+    });
+
+    const width =
+      pdf.internal.pageSize.getWidth();
+
+    const height =
+      (canvas.height * width) /
+      canvas.width;
+
+    pdf.addImage(
+      imgData,
+      "PNG",
+      0,
+      0,
+      width,
+      height
+    );
+
+    pdf.save(
+      "ai-spend-audit-report.pdf"
+    );
+  }
+
   if (!result) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-black text-white">
@@ -48,10 +106,28 @@ export default function ResultsPage() {
   const highSavings =
     result.totalSavings >= 500;
 
+  const chartData =
+    result.recommendations.map(
+      (rec) => ({
+        name: rec.tool,
+
+        Current:
+          rec.currentSpend,
+
+        Optimized:
+          rec.optimizedSpend,
+      })
+    );
+
   return (
     <main className="min-h-screen bg-black text-white">
       <section className="mx-auto max-w-6xl px-6 py-20">
-        <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-zinc-900 to-black p-10">
+        <div
+          ref={reportRef}
+          className="rounded-3xl border border-white/10 bg-gradient-to-b from-zinc-900 to-black p-10"
+        >
+          {/* HEADER */}
+
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-zinc-400">
@@ -71,17 +147,27 @@ export default function ResultsPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-6 py-4">
-              <p className="text-sm text-emerald-400">
-                Annual Savings
-              </p>
+            <div className="flex flex-col gap-4">
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-6 py-4">
+                <p className="text-sm text-emerald-400">
+                  Annual Savings
+                </p>
 
-              <h2 className="mt-2 text-4xl font-bold text-white">
-                $
-                {Math.round(
-                  result.totalSavings * 12
-                )}
-              </h2>
+                <h2 className="mt-2 text-4xl font-bold text-white">
+                  $
+                  {Math.round(
+                    result.totalSavings *
+                      12
+                  )}
+                </h2>
+              </div>
+
+              <button
+                onClick={downloadPDF}
+                className="rounded-xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-zinc-200"
+              >
+                Download PDF Report
+              </button>
             </div>
           </div>
 
@@ -97,6 +183,62 @@ export default function ResultsPage() {
                 result.summary ||
                 "Generating AI summary..."}
             </p>
+          </div>
+
+          {/* CHART */}
+
+          <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6">
+            <div className="mb-6">
+              <h3 className="text-2xl font-semibold">
+                Spend Optimization
+                Analysis
+              </h3>
+
+              <p className="mt-2 text-zinc-400">
+                Compare current AI spend
+                versus optimized
+                recommendations.
+              </p>
+            </div>
+
+            <div className="h-[320px]">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
+                <BarChart
+                  data={chartData}
+                >
+                  <XAxis
+                    dataKey="name"
+                  />
+
+                  <YAxis />
+
+                  <Tooltip />
+
+                  <Bar
+                    dataKey="Current"
+                    radius={[
+                      6,
+                      6,
+                      0,
+                      0,
+                    ]}
+                  />
+
+                  <Bar
+                    dataKey="Optimized"
+                    radius={[
+                      6,
+                      6,
+                      0,
+                      0,
+                    ]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* RECOMMENDATIONS */}
@@ -119,7 +261,7 @@ export default function ResultsPage() {
                       </p>
 
                       <p className="mt-3 max-w-2xl text-sm text-zinc-500">
-                        {rec.reasoning}
+                        {rec.reason}
                       </p>
                     </div>
 
@@ -163,7 +305,7 @@ export default function ResultsPage() {
             )}
           </div>
 
-          {/* CTA SECTION */}
+          {/* CTA */}
 
           <div className="mt-10 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 p-6">
             {highSavings ? (
@@ -175,20 +317,23 @@ export default function ResultsPage() {
 
                 <p className="mt-3 max-w-2xl text-indigo-200/80">
                   Your stack shows
-                  meaningful AI overspend.
-                  Credex can help optimize
-                  vendor contracts and
+                  meaningful AI
+                  overspend. Credex can
+                  help optimize vendor
+                  contracts and
                   infrastructure spend.
                 </p>
 
                 <button className="mt-6 rounded-xl bg-white px-6 py-3 font-semibold text-black">
-                  Book Credex Consultation
+                  Book Credex
+                  Consultation
                 </button>
               </div>
             ) : (
               <div>
                 <h3 className="text-2xl font-semibold text-indigo-300">
-                  Your Spend Looks Healthy
+                  Your Spend Looks
+                  Healthy
                 </h3>
 
                 <p className="mt-3 text-indigo-200/80">

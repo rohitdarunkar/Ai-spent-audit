@@ -1,3 +1,5 @@
+export type TeamSize = number;
+
 export type UseCase =
   | "Coding"
   | "Writing"
@@ -5,13 +7,11 @@ export type UseCase =
   | "Data"
   | "Mixed";
 
-export type TeamSize = number;
-
 export interface ToolConfiguration {
   tool: string;
   plan: string;
-  monthlySpend: number;
   seats: number;
+  monthlySpend: number;
 }
 
 export interface Recommendation {
@@ -20,13 +20,19 @@ export interface Recommendation {
   optimizedSpend: number;
   savings: number;
   action: string;
-  reasoning: string;
+  reason: string;
 }
 
 export interface AuditResult {
-  totalCurrentSpend: number;
-  totalOptimizedSpend: number;
-  totalSavings: number;
   recommendations: Recommendation[];
+
+  totalCurrentSpend: number;
+
+  totalOptimizedSpend: number;
+
+  totalSavings: number;
+
+  annualSavings: number;
+
   summary: string;
 }

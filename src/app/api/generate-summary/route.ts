@@ -1,6 +1,5 @@
-import OpenAI from "openai";
-
 import { NextResponse } from "next/server";
+import OpenAI from "openai";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -10,57 +9,69 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const completion =
+    const {
+      recommendations,
+      totalSavings,
+      annualSavings,
+    } = body;
+
+    const prompt = `
+You are an AI FinOps consultant.
+
+Analyze this AI software spend audit and provide:
+- an executive summary
+- biggest waste areas
+- optimization advice
+- recommended next actions
+
+Data:
+${JSON.stringify(
+  {
+    recommendations,
+    totalSavings,
+    annualSavings,
+  },
+  null,
+  2
+)}
+`;
+
+    const response =
       await client.chat.completions.create({
         model: "gpt-4.1-mini",
 
         messages: [
           {
             role: "system",
-            content: `
-You are an AI infrastructure cost optimization consultant.
-
-Generate concise executive summaries for AI tooling audits.
-
-Be:
-- professional
-- concise
-- financially aware
-- realistic
-- enterprise-focused
-`,
+            content:
+              "You are an expert SaaS cost optimization consultant.",
           },
-
           {
             role: "user",
-            content: `
-Audit data:
-
-${JSON.stringify(body, null, 2)}
-
-Generate:
-1. Executive summary
-2. Biggest optimization opportunity
-3. Cost reduction recommendation
-`,
+            content: prompt,
           },
         ],
 
         temperature: 0.7,
       });
 
+    const summary =
+      response.choices[0].message.content;
+
     return NextResponse.json({
-      summary:
-        completion.choices[0].message
-          .content,
+      summary,
     });
   } catch (error) {
+    console.error(error);
+
     return NextResponse.json(
       {
-        summary:
-          "Your AI stack appears reasonably optimized with limited overspend opportunities detected.",
+        error:
+          "Failed to generate summary",
       },
-      { status: 200 }
+      {
+        status: 500,
+      }
     );
   }
 }
